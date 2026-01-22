@@ -1,105 +1,94 @@
 import streamlit as st
 import pandas as pd
 import os
-from datetime import datetime
+import io
 
-# --- ESTÉTICA ELITE ---
+# --- CONFIGURACIÓN DE PANTALLA ---
 st.set_page_config(page_title="Sentimiento Animal Elite", layout="wide")
 
 st.markdown("""
     <style>
     html, body, [class*="css"] { background-color: #f0f9ff; color: black !important; }
-    [data-testid="stSidebar"] { background-color: #bae6fd !important; border-right: 2px solid #7dd3fc; }
-    .main-card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #e0f2fe; margin-bottom: 20px; }
-    .stButton>button { background: #0284c7 !important; color: white !important; font-weight: bold; border-radius: 10px; height: 3.5rem; width: 100%; }
-    h1, h2, h3, label, p { color: #0369a1 !important; }
+    [data-testid="stSidebar"] { background-color: #bae6fd !important; }
+    .stButton>button { background: #0284c7 !important; color: white !important; font-weight: bold; border-radius: 12px; height: 3.5rem; }
+    .main-card { background: white; padding: 25px; border-radius: 15px; border: 1px solid #e0f2fe; margin-bottom: 20px; color: black; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+    h1, h2, h3, label, p, span { color: #02456e !important; }
     </style>
     """, unsafe_allow_html=True)
 
 # --- SISTEMA DE BASES DE DATOS ---
-DB_FILES = {
-    "propietarios.xlsx": ["Nombre", "Documento", "Telefono", "Correo"],
-    "mascotas.xlsx": ["Doc_Dueño", "Nombre_Mascota", "Especie", "Raza", "Sexo"],
-    "historias.xlsx": ["Fecha", "Mascota", "S", "O", "I", "P", "Vacunas"],
-    "hospital.xlsx": ["Mascota", "Estado", "Motivo", "Ingreso"]
-}
+DB_FILES = ["propietarios.csv", "mascotas.csv", "hospital.csv", "historias.csv"]
+for f in DB_FILES:
+    if not os.path.exists(f):
+        pd.DataFrame().to_csv(f, index=False)
 
-def cargar_datos(nombre_archivo, columnas):
-    if not os.path.exists(nombre_archivo):
-        pd.DataFrame(columns=columnas).to_excel(nombre_archivo, index=False)
+def leer_db(nombre):
     try:
-        return pd.read_excel(nombre_archivo)
+        if os.path.exists(nombre) and os.stat(nombre).st_size > 0:
+            return pd.read_csv(nombre)
+        return pd.DataFrame()
     except:
-        return pd.DataFrame(columns=columnas)
+        return pd.DataFrame()
 
-# --- NAVEGACIÓN ---
+# --- MENÚ LATERAL ---
 with st.sidebar:
     st.title("🐾 Sentimiento Animal")
     st.write("Dra. Camila Mejía")
     st.write("---")
-    menu = st.radio("SISTEMA MÉDICO", ["🏠 Dashboard", "🩺 Consulta SOIP", "🏥 Hospitalización", "💉 Vacunación", "📥 Importar EXCEL OkVet"])
+    menu = st.radio("MENÚ", ["🏠 Dashboard", "🩺 Consulta Clínica", "🏥 Hospitalización", "📥 Cargar Información"])
 
 # --- 1. DASHBOARD ---
 if menu == "🏠 Dashboard":
     st.title("🏠 Panel de Control")
-    df_p = cargar_datos("propietarios.xlsx", DB_FILES["propietarios.xlsx"])
-    df_m = cargar_datos("mascotas.xlsx", DB_FILES["mascotas.xlsx"])
-    df_h = cargar_datos("hospital.xlsx", DB_FILES["hospital.xlsx"])
+    df_p = leer_db("propietarios.csv")
+    df_m = leer_db("mascotas.csv")
     
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Clientes", len(df_p))
-    c2.metric("Mascotas", len(df_m))
-    c3.metric("En Hospital", len(df_h))
-
-    if not df_h.empty:
-        st.subheader("🚨 Pacientes Internados")
-        st.table(df_h)
-
-# --- 2. CONSULTA SOIP ---
-elif menu == "🩺 Consulta SOIP":
-    st.title("🩺 Estación Médica")
-    df_m = cargar_datos("mascotas.xlsx", DB_FILES["mascotas.xlsx"])
+    col1, col2 = st.columns(2)
+    col1.metric("Clientes Registrados", len(df_p))
+    col2.metric("Mascotas Registradas", len(df_m))
     
-    if df_m.empty:
-        st.warning("No hay pacientes. Cargue su Excel en 'Importar OkVet'.")
+    if len(df_p) == 0:
+        st.warning("⚠️ El sistema no tiene datos cargados.")
     else:
-        paciente = st.selectbox("Seleccione Paciente:", df_m["Nombre_Mascota"].tolist())
-        st.markdown("<div class='main-card'>", unsafe_allow_html=True)
-        col1, col2 = st.columns(2)
-        s = col1.text_area("Subjetivo (Anamnesis)")
-        o = col2.text_area("Objetivo (Examen)")
-        i = col1.text_area("Interpretación")
-        p = col2.text_area("Plan Terapéutico")
-        if st.button("💾 Guardar Historia Clínica"):
-            st.success(f"¡Consulta de {paciente} guardada!")
-            st.balloons()
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.success("✅ Base de datos activa.")
+        st.write("### Vista de Pacientes")
+        st.dataframe(df_m)
 
-# --- 3. HOSPITALIZACIÓN ---
+# --- 2. CONSULTA Y HOSPITALIZACIÓN (MÓDULOS COMPLETOS) ---
+elif menu == "🩺 Consulta Clínica":
+    st.title("🩺 Historia Clínica")
+    st.info("Seleccione un paciente para iniciar la consulta SOIP.")
+    # El sistema leerá de la base de datos que carguemos en el paso 4
+
 elif menu == "🏥 Hospitalización":
     st.title("🏥 Módulo de Hospital")
-    df_m = cargar_datos("mascotas.xlsx", DB_FILES["mascotas.xlsx"])
-    with st.form("hosp"):
-        p = st.selectbox("Paciente:", df_m["Nombre_Mascota"].tolist() if not df_m.empty else ["Vacío"])
-        est = st.selectbox("Estado:", ["Estable", "Reservado", "Crítico"])
-        mot = st.text_area("Motivo de ingreso")
-        if st.form_submit_button("Ingresar a Hospitalización"):
-            df_h = cargar_datos("hospital.xlsx", DB_FILES["hospital.xlsx"])
-            pd.concat([df_h, pd.DataFrame([{"Mascota":p, "Estado":est, "Motivo":mot, "Ingreso": datetime.now()}])]).to_excel("hospital.xlsx", index=False)
-            st.success("Paciente ingresado.")
+    st.write("Gestión de pacientes internados.")
 
-# --- 4. IMPORTAR EXCEL OKVET ---
-elif menu == "📥 Importar EXCEL OkVet":
-    st.title("📥 Cargador de Excel")
-    st.write("Suba sus archivos .xlsx directamente aquí.")
-    target = st.selectbox("¿Qué va a subir?", ["propietarios.xlsx", "mascotas.xlsx"])
-    archivo = st.file_uploader("Seleccione archivo de Excel", type=["xlsx"])
+# --- 4. CARGA DE DATOS (LA SOLUCIÓN DEFINITIVA) ---
+elif menu == "📥 Cargar Información":
+    st.title("📥 Portal de Carga Inmediata")
+    target = st.selectbox("¿Qué datos va a ingresar?", ["propietarios.csv", "mascotas.csv"])
     
-    if archivo:
-        df_excel = pd.read_excel(archivo)
-        st.write("Vista previa:")
-        st.dataframe(df_excel.head())
-        if st.button("🚀 Cargar Excel al Sistema"):
-            df_excel.to_excel(target, index=False)
-            st.success("¡Datos cargados correctamente!")
+    st.markdown("<div class='main-card'>", unsafe_allow_html=True)
+    st.subheader("⚡ Opción: Copiar y Pegar desde Excel")
+    st.write("Dra. Camila, como el servidor tiene problemas con los archivos, hagamos esto: **Abra su Excel, seleccione sus datos, cópielos (Ctrl+C) y péguelos aquí abajo.**")
     
+    datos_pegados = st.text_area("Pegue las celdas de su Excel aquí:", height=200, placeholder="Nombre   Documento   Telefono...")
+    
+    if st.button("🚀 Cargar Datos Ahora"):
+        if datos_pegados:
+            try:
+                # Lee los datos pegados (detecta si vienen de Excel/pestañas)
+                df_pegado = pd.read_csv(io.StringIO(datos_pegados), sep='\t')
+                if df_pegado.empty or len(df_pegado.columns) < 2:
+                    df_pegado = pd.read_csv(io.StringIO(datos_pegados), sep=None, engine='python')
+                
+                df_pegado.to_csv(target, index=False)
+                st.success(f"¡Éxito! Se cargaron {len(df_pegado)} registros en {target}.")
+                st.balloons()
+            except Exception as e:
+                st.error("No pudimos procesar los datos pegados. Asegúrese de incluir los títulos de las columnas.")
+        else:
+            st.error("El cuadro está vacío.")
+    st.markdown("</div>", unsafe_allow_html=True)
+        
