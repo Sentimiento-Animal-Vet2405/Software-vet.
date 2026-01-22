@@ -1,93 +1,130 @@
 import streamlit as st
 import pandas as pd
 import io
+import os
 from datetime import datetime
 
-# --- CONFIGURACIÓN DE APARIENCIA ---
-st.set_page_config(page_title="Sentimiento Animal - OkVet Style", layout="wide")
+# --- CONFIGURACIÓN ESTÉTICA AVANZADA ---
+st.set_page_config(page_title="Sentimiento Animal - OkVet", layout="wide")
 
-# CSS para imitar la interfaz de las fotos (OkVet)
 st.markdown("""
     <style>
-    .main { background-color: #f8f9fa; }
-    .stButton>button { width: 100%; border-radius: 20px; background-color: #3b82f6; color: white; }
-    .stTextInput>div>div>input { border-radius: 10px; }
-    .block-container { padding-top: 2rem; }
-    .st-expander { background-color: white; border-radius: 15px; border: 1px solid #e2e8f0; }
-    h1 { color: #1e3a8a; font-family: 'sans-serif'; }
+    .main { background-color: #f1f5f9; }
+    [data-testid="stSidebar"] { background-color: #0f172a; }
+    .stButton>button { 
+        border-radius: 8px; background-color: #2563eb; color: white; 
+        font-weight: bold; height: 3.5rem; border: none;
+    }
+    .st-expander { background-color: white !important; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    h1, h2 { color: #1e293b; font-family: 'Helvetica Neue', sans-serif; }
+    .card { background-color: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- MENÚ LATERAL (Como el de la foto) ---
+# --- BASE DE DATOS ---
+DB_PATH = "base_datos_vet.csv"
+if not os.path.exists(DB_PATH):
+    columnas = ["Fecha", "Mascota", "Propietario", "Tipo", "Detalles", "Peso", "T", "FC", "FR", "Plan"]
+    pd.DataFrame(columns=columnas).to_csv(DB_PATH, index=False)
+
+def guardar_registro(data):
+    df = pd.read_csv(DB_PATH)
+    df = pd.concat([df, pd.DataFrame([data])], ignore_index=True)
+    df.to_csv(DB_PATH, index=False)
+
+# --- MENÚ LATERAL ---
 with st.sidebar:
-    st.image("logo.png", width=150)
-    st.title("SENTIMIENTO ANIMAL VET")
+    if os.path.exists("logo.png"): st.image("logo.png")
+    st.title("OKVET SYSTEM")
     st.markdown("---")
-    menu = st.radio("MENÚ", [
-        "🏠 Historia Clínica", 
-        "📋 Consultas (SOIP)", 
-        "💉 Vacunación", 
-        "💊 Fórmulas médicas",
-        "🐛 Desparasitaciones",
+    menu = st.radio("Navegación Profesional", [
+        "🏠 Dashboard",
+        "📋 Consulta (SOIP)",
         "🏥 Hospitalización",
-        "🧬 Exámenes",
-        "🚑 Remisiones"
+        "💉 Vacunación",
+        "💊 Fórmulas Médicas",
+        "📂 Historial General"
     ])
 
-# --- LÓGICA DE MÓDULOS ---
-
-if menu == "📋 Consultas (SOIP)":
-    st.markdown(f"## 📋 Registro de Consulta - {datetime.now().strftime('%d/%m/%Y')}")
+# --- MÓDULO: HOSPITALIZACIÓN (Con Tabla de Constantes) ---
+if menu == "🏥 Hospitalización":
+    st.header("🏥 Registro de Hospitalización / Monitoreo")
     
     with st.container():
-        # Encabezado rápido
-        col_p1, col_p2, col_p3 = st.columns(3)
-        paciente = col_p1.text_input("Mascota", placeholder="Ej: Lucky Munera")
-        propietario = col_p2.text_input("Propietario", placeholder="Ej: Mariana Munera")
-        motivo = col_p3.selectbox("Motivo", ["Consulta General", "Urgencia", "Control", "Procedimiento"])
+        c1, c2, c3 = st.columns(3)
+        paciente = c1.text_input("Paciente")
+        propietario = c2.text_input("Propietario")
+        fecha_ingreso = c3.date_input("Fecha de Ingreso")
 
-        st.markdown("---")
+        st.markdown("#### 📊 Monitoreo de Constantes Fisiológicas")
+        # Tabla de constantes como en OkVet
+        col_t1, col_t2, col_t3, col_t4 = st.columns(4)
+        temp = col_t1.text_input("T° (°C)")
+        fc = col_t2.text_input("FC (lpm)")
+        fr = col_t3.text_input("FR (rpm)")
+        tllc = col_t4.text_input("TLLC (seg)")
         
-        # Formato SOIP (Como en tu foto)
-        col1, col2 = st.columns(2)
-        with col1:
-            subjetivo = st.text_area("S: Subjetivo (Anamnesis)", placeholder="Motivo de la consulta y antecedentes...")
-            interpretacion = st.text_area("I: Interpretación (Diagnóstico)", placeholder="Diagnóstico presuntivo o final...")
+        fluidos = st.text_area("Fluidoterapia y Medicación Intrahospitalaria")
+        evolucion = st.text_area("Notas de Evolución Clínica")
+
+        if st.button("💾 GUARDAR MONITOREO"):
+            data = {
+                "Fecha": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "Mascota": paciente, "Propietario": propietario,
+                "Tipo": "Hospitalización", "T": temp, "FC": fc, "FR": fr,
+                "Detalles": evolucion, "Plan": fluidos
+            }
+            guardar_registro(data)
+            st.success("Registro de hospitalización guardado.")
+
+# --- MÓDULO: VACUNACIÓN ---
+elif menu == "💉 Vacunación":
+    st.header("💉 Plan de Vacunación")
+    with st.expander("Registrar Aplicación de Vacuna", expanded=True):
+        col_v1, col_v2 = st.columns(2)
+        v_paciente = col_v1.text_input("Nombre Mascota")
+        v_tipo = col_v2.selectbox("Vacuna", ["Triple Felina", "Rabia", "Parvovirus/Moquillo", "Pentavalente", "Leucemia", "Otra"])
         
-        with col2:
-            objetivo = st.text_area("O: Objetivo (Examen Físico)", placeholder="Detalles del examen, listado de problemas...")
-            plan = st.text_area("P: Plan Terapéutico", placeholder="Tratamiento y medicamentos...")
-
-        st.markdown("---")
-        proximo = st.date_input("Próximo control")
+        v_lote = st.text_input("Lote / Marca de la Vacuna")
+        v_proxima = st.date_input("Fecha sugerida de refuerzo")
         
-        if st.button("💾 GUARDAR CONSULTA Y GENERAR PDF"):
-            st.success(f"Consulta de {paciente} guardada exitosamente en el sistema.")
-            # Aquí se activaría la descarga del PDF que ya tenemos configurada
+        if st.button("💾 REGISTRAR VACUNA"):
+            data = {"Fecha": datetime.now().strftime("%Y-%m-%d"), "Mascota": v_paciente, "Tipo": "Vacuna", "Detalles": f"{v_tipo} - Lote: {v_lote}", "Plan": f"Refuerzo: {v_proxima}"}
+            guardar_registro(data)
+            st.success("Vacuna registrada en el historial.")
 
-elif menu == "🏠 Historia Clínica":
-    st.header("🐾 Datos Generales de la Mascota")
-    # Simulación de la ficha de la foto
-    c1, c2 = st.columns([1, 2])
-    with c1:
-        st.info("Cargar foto de la mascota")
-    with c2:
-        st.markdown("""
-        **Especie:** Canino | **Raza:** Schnauzer Gigante | **Género:** Hembra
-        **Peso:** 10.79 kg | **Edad:** 14 años, 2 meses
-        """)
-        st.line_chart([10.5, 11.2, 10.8, 10.79]) # Gráfico de peso como en la foto
+# --- MÓDULO: CONSULTA SOIP (Repetimos para consistencia) ---
+elif menu == "📋 Consulta (SOIP)":
+    st.header("📋 Consulta Médica (SOIP)")
+    with st.form("soip_form"):
+        c1, c2 = st.columns(2)
+        paciente = c1.text_input("Mascota")
+        dueno = c2.text_input("Propietario")
+        
+        s = st.text_area("Subjetivo")
+        o = st.text_area("Objetivo")
+        i = st.text_area("Interpretación")
+        p = st.text_area("Plan")
+        
+        if st.form_submit_button("💾 GUARDAR CONSULTA"):
+            data = {"Fecha": datetime.now().strftime("%Y-%m-%d %H:%M"), "Mascota": paciente, "Propietario": dueno, "Tipo": "Consulta", "Detalles": f"S:{s} O:{o} I:{i}", "Plan": p}
+            guardar_registro(data)
+            st.success("Consulta guardada.")
 
-elif menu == "💊 Fórmulas médicas":
-    st.header("💊 Registro de Fórmula Médica")
-    with st.expander("+ Agregar Medicamento", expanded=True):
-        st.text_input("Nombre del Medicamento")
-        col_f1, col_f2 = st.columns(2)
-        col_f1.text_input("Presentación")
-        col_f2.number_input("Cantidad", value=1)
-        st.text_area("Posología (Forma de administración)")
-    st.button("Generar Receta Médica")
+# --- MÓDULO: DASHBOARD ---
+elif menu == "🏠 Dashboard":
+    st.header("🏠 Resumen Sentimiento Animal")
+    df = pd.read_csv(DB_PATH)
+    
+    col_a, col_b, col_c = st.columns(3)
+    col_a.metric("Pacientes Totales", len(df["Mascota"].unique()))
+    col_b.metric("Atenciones Mes", len(df))
+    col_c.metric("Estado de Red", "Online ✅")
+    
+    st.markdown("### 📅 Últimas 5 Actividades")
+    st.dataframe(df.tail(5), use_container_width=True)
 
-# --- LOS DEMÁS MÓDULOS SIGUEN LA MISMA ESTÉTICA ---
-else:
-    st.info(f"Módulo de {menu} en desarrollo para imitar la interfaz de OkVet.")
+# --- MÓDULO: HISTORIAL ---
+elif menu == "📂 Historial General":
+    st.header("📂 Buscador de Historias Clínicas")
+    buscar = st.text
