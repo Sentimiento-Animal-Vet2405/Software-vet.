@@ -11,15 +11,29 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #bae6fd !important; }
     .main-card { background: white; padding: 20px; border-radius: 15px; border: 1px solid #e0f2fe; color: black; margin-bottom:10px; }
     h1, h2, h3, p, label { color: black !important; }
-    .stButton>button { background: #0284c7; color: white !important; border-radius: 10px; font-weight: bold; }
+    .stButton>button { background: #0284c7; color: white !important; border-radius: 10px; font-weight: bold; width: 100%; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- BASES DE DATOS ---
-DB_FILES = ["propietarios.csv", "mascotas.csv", "historias.csv", "hospitalizados.csv"]
-for db in DB_FILES:
-    if not os.path.exists(db):
-        pd.DataFrame().to_csv(db, index=False)
+# --- INICIALIZACIÓN DE BASES DE DATOS (CON COLUMNAS PARA EVITAR ERRORES) ---
+DB_FILES = {
+    "propietarios.csv": ["Nombre", "Tipo_Doc", "Numero", "Teléfono", "Correo", "Dirección"],
+    "mascotas.csv": ["ID_Prop", "Nombre_Mascota", "Especie", "Raza", "Sexo", "Color", "Peso_kg", "Nacimiento"],
+    "historias.csv": ["Fecha", "ID_Prop", "Mascota", "S", "O", "I", "P", "Vacunas", "Lab", "Hosp"],
+    "hospitalizados.csv": ["Paciente", "Propietario", "Estado", "Motivo", "Ingreso"]
+}
+
+for db, cols in DB_FILES.items():
+    if not os.path.exists(db) or os.stat(db).st_size == 0:
+        pd.DataFrame(columns=cols).to_csv(db, index=False)
+
+# --- FUNCION PARA LEER SEGURO ---
+def cargar_datos(archivo):
+    try:
+        df = pd.read_csv(archivo)
+        return df
+    except:
+        return pd.DataFrame(columns=DB_FILES[archivo])
 
 # --- NAVEGACIÓN ---
 with st.sidebar:
@@ -27,50 +41,63 @@ with st.sidebar:
     st.write("---")
     menu = st.radio("MENÚ", ["🏠 Dashboard", "📥 Importar Datos", "🩺 Consulta", "👥 Clientes"])
 
-# --- MODULO DE IMPORTACIÓN ULTRA-FLEXIBLE ---
-if menu == "📥 Importar Datos":
-    st.title("📥 Importación de Datos (OkVet)")
-    st.write("Dra. Camila, intente subir su archivo aquí. Si falla, usaremos el modo manual.")
+# --- DASHBOARD ---
+if menu == "🏠 Dashboard":
+    st.title("🏠 Inicio")
+    df_p = cargar_datos("propietarios.csv")
+    df_m = cargar_datos("mascotas.csv")
     
-    target = st.selectbox("¿Qué datos va a subir?", ["propietarios", "mascotas"])
+    col1, col2 = st.columns(2)
+    col1.metric("Clientes Registrados", len(df_p))
+    col2.metric("Mascotas Registradas", len(df_m))
     
     st.markdown("<div class='main-card'>", unsafe_allow_html=True)
-    archivo = st.file_uploader("Subir archivo CSV o Excel", type=["csv", "xlsx"])
+    st.subheader("Bienvenida Dra. Camila Mejía")
+    if len(df_p) == 0:
+        st.info("👋 El sistema está listo. Para empezar, vaya a 'Importar Datos' y suba su archivo de OkVet o registre un cliente manualmente.")
+    else:
+        st.success("Sistema activo con datos cargados.")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# --- MODULO DE IMPORTACIÓN ---
+elif menu == "📥 Importar Datos":
+    st.title("📥 Importación de Datos (OkVet)")
+    target = st.selectbox("¿Qué datos va a subir?", ["propietarios.csv", "mascotas.csv"])
+    
+    st.markdown("<div class='main-card'>", unsafe_allow_html=True)
+    archivo = st.file_uploader("Subir archivo CSV (Si tiene Excel, guárdelo como CSV primero)", type=["csv"])
     
     if archivo:
         try:
-            # Lector Inteligente: Intenta Excel, si falla intenta CSV con coma, si falla con punto y coma
-            if archivo.name.endswith('.xlsx'):
-                df = pd.read_excel(archivo)
-            else:
-                try:
-                    df = pd.read_csv(archivo, sep=',')
-                except:
-                    df = pd.read_csv(archivo, sep=';')
+            # Intenta leer con diferentes separadores comunes en Excel/Latam
+            try:
+                df = pd.read_csv(archivo, sep=',')
+            except:
+                df = pd.read_csv(archivo, sep=';')
             
-            st.success("¡Archivo leído! Vista previa:")
+            st.write("✅ Vista previa de los datos encontrados:")
             st.dataframe(df.head(5))
             
-            if st.button("🚀 GUARDAR EN EL SISTEMA"):
-                df.to_csv(f"{target}.csv", index=False)
-                st.success(f"Se han guardado {len(df)} registros en {target}.")
+            if st.button("🚀 GUARDAR E INTEGRAR DATOS"):
+                df_actual = cargar_datos(target)
+                df_final = pd.concat([df_actual, df]).drop_duplicates()
+                df_final.to_csv(target, index=False)
+                st.success(f"¡Éxito! Se han integrado los datos en {target}.")
                 st.balloons()
         except Exception as e:
-            st.error(f"No pudimos leer el archivo. Intente guardarlo como 'CSV delimitado por comas' en Excel.")
-            st.info("Sugerencia: Abra su Excel, elija 'Guardar como' -> 'CSV (delimitado por comas)'.")
+            st.error("Error al leer el archivo. Asegúrese de que sea un archivo CSV válido.")
     st.markdown("</div>", unsafe_allow_html=True)
 
-# --- DASHBOARD ---
-elif menu == "🏠 Dashboard":
-    st.title("🏠 Inicio")
-    df_p = pd.read_csv("propietarios.csv")
-    df_m = pd.read_csv("mascotas.csv")
-    
-    c1, c2 = st.columns(2)
-    c1.metric("Clientes", len(df_p))
-    c2.metric("Mascotas", len(df_m))
-    
-    if len(df_p) == 0:
-        st.warning("El sistema está vacío. Vaya a 'Importar Datos' para cargar su información de OkVet.")
-
-# (Resto de funciones simplificadas para asegurar carga rápida)
+# --- CLIENTES (REGISTRO MANUAL) ---
+elif menu == "👥 Clientes":
+    st.title("👥 Registro Manual")
+    with st.form("manual_cli"):
+        n = st.text_input("Nombre")
+        d = st.text_input("Documento")
+        t = st.text_input("Teléfono")
+        if st.form_submit_button("Guardar"):
+            df_p = cargar_datos("propietarios.csv")
+            new_p = pd.DataFrame([{"Nombre":n, "Numero":d, "Teléfono":t}])
+            pd.concat([df_p, new_p]).to_csv("propietarios.csv", index=False)
+            st.success("Guardado manualmente.")
+            
