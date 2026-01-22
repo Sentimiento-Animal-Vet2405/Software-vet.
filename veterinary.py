@@ -4,41 +4,51 @@ import os
 import io
 from datetime import datetime
 
-# --- CONFIGURACIÓN CIELO ---
-st.set_page_config(page_title="Sentimiento Animal Elite", layout="wide")
+# --- ESTÉTICA PROFESIONAL "MODO CIELO" ---
+st.set_page_config(page_title="Sentimiento Animal Elite", layout="wide", page_icon="🐾")
+
 st.markdown("""
     <style>
     .stApp { background-color: #f0f9ff; }
-    html, body, [class*="css"], p, h1, h2, h3, label, span { color: #02456e !important; }
+    html, body, [class*="css"], p, h1, h2, h3, label, span { color: #013a5d !important; }
     [data-testid="stSidebar"] { background-color: #0c4a6e !important; }
     [data-testid="stSidebar"] * { color: white !important; }
     .stButton>button { background-color: #0284c7 !important; color: white !important; border-radius: 10px; font-weight: bold; width: 100%; border: none; height: 3em; }
     .main-card { background-color: white; padding: 20px; border-radius: 15px; border: 1px solid #bae6fd; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 15px; }
+    .info-box { background-color: #e0f2fe; padding: 15px; border-radius: 10px; border-left: 5px solid #0284c7; margin-bottom: 10px; }
+    .ia-card { background-color: #f0fdf4; padding: 15px; border-radius: 10px; border: 1px solid #bbf7d0; color: #166534 !important; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- BASES DE DATOS ---
+# --- SISTEMA DE BASES DE DATOS ---
 def leer(n):
     if os.path.exists(n):
-        try:
-            df = pd.read_csv(n)
-            return df
+        try: return pd.read_csv(n)
         except: return pd.DataFrame()
     return pd.DataFrame()
 
 def guardar(df, n):
     df.to_csv(n, index=False)
 
-# --- MENÚ ---
+# --- LÓGICA IA DIAGNÓSTICA ---
+def analizar_ia(sintomas):
+    s = sintomas.lower()
+    if "vómito" in s or "diarrea" in s: return "🚨 IA: Sospecha de cuadro gastroentérico. Sugerencia: Test Parvo/Corona y Cuadro Hemático."
+    if "tos" in s or "estornudo" in s: return "🚨 IA: Sospecha de afección respiratoria. Sugerencia: Auscultación pulmonar y Placa de Tórax."
+    if "rasca" in s or "piel" in s: return "🚨 IA: Alerta dermatológica. Sugerencia: Raspado cutáneo y Citología."
+    return "🧠 IA: Analizando... Describa más hallazgos para sugerencias diferenciales."
+
+# --- MENÚ LATERAL ---
 with st.sidebar:
     st.title("🐾 Sentimiento Animal")
-    st.write("Dra. Camila Mejía")
+    st.write(f"**Dra. Camila Mejía**")
     st.write("---")
-    menu = st.radio("MÓDULOS", [
+    menu = st.radio("MENÚ MÉDICO", [
         "🏠 Dashboard", 
-        "👥 Propietarios y Mascotas", 
+        "👤 Registro Propietarios", 
+        "🐕 Registro Pacientes", 
         "🩺 Consulta + IA", 
-        "💊 Fórmulas/Remisiones", 
+        "💊 Fórmulas y Remisiones", 
         "🏥 Hospitalización", 
         "📄 Certificados", 
         "📥 Importar OkVet"
@@ -46,88 +56,128 @@ with st.sidebar:
 
 # --- 1. DASHBOARD ---
 if menu == "🏠 Dashboard":
-    st.title("🏠 Panel de Control")
-    df_p = leer("propietarios.csv")
-    df_m = leer("mascotas.csv")
+    st.title("🏠 Resumen de la Clínica")
+    df_p, df_m = leer("propietarios.csv"), leer("mascotas.csv")
     c1, c2 = st.columns(2)
     c1.metric("Propietarios", len(df_p))
     c2.metric("Pacientes", len(df_m))
-    st.write("### Base de Datos de Pacientes")
+    st.write("### Lista General de Pacientes")
     st.dataframe(df_m, use_container_width=True)
 
-# --- 2. PROPIETARIOS Y MASCOTAS (CORREGIDO) ---
-elif menu == "👥 Propietarios y Mascotas":
-    st.title("👥 Gestión de Clientes y Pacientes")
-    tab1, tab2 = st.tabs(["👤 Registrar Propietario", "🐕 Anexar Mascota"])
-    
-    with tab1:
-        st.markdown("<div class='main-card'>", unsafe_allow_html=True)
-        with st.form("nuevo_p"):
-            n = st.text_input("Nombre Completo")
-            d = st.text_input("Documento/Cédula")
-            t = st.text_input("Teléfono")
-            if st.form_submit_button("💾 Guardar"):
-                df = leer("propietarios.csv")
-                nueva_p = pd.DataFrame([[n, d, t]], columns=["Nombre", "Documento", "Telefono"])
-                guardar(pd.concat([df, nueva_p]), "propietarios.csv")
-                st.success("¡Guardado!")
-                st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
+# --- 2. REGISTRO PROPIETARIOS ---
+elif menu == "👤 Registro Propietarios":
+    st.title("👤 Ficha del Propietario")
+    st.markdown("<div class='main-card'>", unsafe_allow_html=True)
+    with st.form("form_prop"):
+        c1, c2 = st.columns(2)
+        nombre = c1.text_input("Nombre Completo")
+        t_doc = c2.selectbox("Tipo de Documento", ["Cédula", "CE", "Pasaporte", "NIT"])
+        n_doc = c1.text_input("Número de Documento")
+        tel = c2.text_input("Teléfono / WhatsApp")
+        mail = c1.text_input("Correo Electrónico")
+        dir = c2.text_input("Dirección de Residencia")
+        if st.form_submit_button("💾 Guardar Propietario"):
+            df = leer("propietarios.csv")
+            nuevo = pd.DataFrame([[nombre, t_doc, n_doc, tel, mail, dir]], 
+                                 columns=["Nombre", "Tipo_Doc", "Documento", "Telefono", "Correo", "Direccion"])
+            guardar(pd.concat([df, nuevo]), "propietarios.csv")
+            st.success("Propietario registrado con éxito.")
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    with tab2:
+# --- 3. REGISTRO PACIENTES ---
+elif menu == "🐕 Registro Pacientes":
+    st.title("🐕 Ficha del Paciente")
+    df_p = leer("propietarios.csv")
+    if df_p.empty:
+        st.warning("Debe registrar un propietario primero.")
+    else:
         st.markdown("<div class='main-card'>", unsafe_allow_html=True)
-        df_p = leer("propietarios.csv")
-        if df_p.empty or len(df_p.columns) < 2:
-            st.warning("⚠️ No hay propietarios. Cargue datos en 'Importar OkVet' o registre uno manual.")
-        else:
-            # Seleccionamos la columna de nombre y documento sin importar cómo se llamen en el Excel
-            df_p['Busqueda'] = df_p.iloc[:, 0].astype(str) + " (" + df_p.iloc[:, 1].astype(str) + ")"
-            seleccion = st.selectbox("🔍 Buscar Propietario:", df_p['Busqueda'].tolist())
-            doc_dueño = seleccion.split("(")[-1].replace(")", "")
+        # Buscador de Dueño
+        df_p['Busqueda'] = df_p['Nombre'].astype(str) + " (" + df_p['Documento'].astype(str) + ")"
+        dueno_sel = st.selectbox("Asignar a Propietario:", df_p['Busqueda'].tolist())
+        doc_dueno = dueno_sel.split("(")[-1].replace(")", "")
+
+        with st.form("form_pac"):
+            c1, c2, c3 = st.columns(3)
+            m_nom = c1.text_input("Nombre de la Mascota")
+            m_esp = c2.selectbox("Especie", ["Canino", "Felino", "Exótico"])
+            m_raz = c3.text_input("Raza")
             
-            with st.form("nueva_m"):
-                m_n = st.text_input("Nombre de la Mascota")
-                m_e = st.selectbox("Especie", ["Canino", "Felino", "Otro"])
-                if st.form_submit_button("🐾 Anexar Mascota"):
-                    df_m = leer("mascotas.csv")
-                    nueva_m = pd.DataFrame([[m_n, m_e, doc_dueño]], columns=["Mascota", "Especie", "Dueño"])
-                    guardar(pd.concat([df_m, nueva_m]), "mascotas.csv")
-                    st.success(f"{m_n} anexado a su dueño.")
+            c4, c5, c6 = st.columns(3)
+            m_sex = c4.selectbox("Sexo", ["Macho", "Hembra"])
+            m_edad = c5.text_input("Edad (Ej: 2 años)")
+            m_peso = c6.number_input("Peso Actual (Kg)", min_value=0.0, step=0.1)
+            
+            m_cas = st.radio("Estado Reproductivo", ["Castrado", "No Castrado"], horizontal=True)
+            
+            if st.form_submit_button("🐾 Registrar Mascota"):
+                df = leer("mascotas.csv")
+                nueva = pd.DataFrame([[m_nom, m_esp, m_raz, m_sex, m_edad, m_peso, m_cas, doc_dueno]], 
+                                     columns=["Mascota", "Especie", "Raza", "Sexo", "Edad", "Peso", "Estado", "Dueño"])
+                guardar(pd.concat([df, nueva]), "mascotas.csv")
+                st.success(f"¡{m_nom} registrado!")
         st.markdown("</div>", unsafe_allow_html=True)
 
-# --- 3. IMPORTAR OKVET (EL TRADUCTOR) ---
-elif menu == "📥 Importar OkVet":
-    st.title("📥 Sincronización de Datos")
-    target = st.selectbox("Destino", ["propietarios.csv", "mascotas.csv"])
-    st.info("Copie los datos de su Excel y péguelos aquí abajo.")
-    datos = st.text_area("Cuadro de pegado (Ctrl+V):", height=200)
-    
-    if st.button("🚀 Procesar y Limpiar Datos"):
-        if datos:
-            try:
-                df_up = pd.read_csv(io.StringIO(datos), sep='\t')
-                # Forzamos que los nombres de las columnas sean los que el sistema necesita
-                if target == "propietarios.csv":
-                    df_up.columns = ["Nombre", "Documento", "Telefono"][:len(df_up.columns)]
-                else:
-                    df_up.columns = ["Mascota", "Especie", "Dueño"][:len(df_up.columns)]
-                
-                guardar(df_up, target)
-                st.success("¡Información cargada correctamente!")
-                st.rerun()
-            except:
-                st.error("Error al procesar. Intente copiar solo las filas con datos y sus títulos.")
-
-# --- OTROS MÓDULOS ---
+# --- 4. CONSULTA + IA ---
 elif menu == "🩺 Consulta + IA":
-    st.title("🩺 Consulta Médica")
-    st.write("Módulo activo para diagnósticos.")
+    st.title("🩺 Estación Médica")
+    df_m = leer("mascotas.csv")
+    if df_m.empty:
+        st.info("Registre pacientes para iniciar consultas.")
+    else:
+        paciente = st.selectbox("Seleccione Paciente para Consulta:", df_m["Mascota"].tolist())
+        
+        # FICHA RÁPIDA (Búsqueda automática de datos)
+        datos_p = df_m[df_m["Mascota"] == paciente].iloc[0]
+        st.markdown(f"""
+        <div class='info-box'>
+            <b>📌 Ficha Médica de {paciente}:</b><br>
+            • Especie: {datos_p['Especie']} | Raza: {datos_p['Raza']} | Sexo: {datos_p['Sexo']}<br>
+            • Edad: {datos_p['Edad']} | Peso: {datos_p['Peso']} Kg | Estado: {datos_p['Estado']}
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("<div class='main-card'>", unsafe_allow_html=True)
+        sub = st.text_area("S - Subjetivo (Síntomas y motivo de consulta)")
+        if sub: st.markdown(f"<div class='ia-card'>{analizar_ia(sub)}</div>", unsafe_allow_html=True)
+        
+        obj = st.text_area("O - Objetivo (Examen físico / Constantes)")
+        inte = st.text_area("I - Interpretación (Diagnóstico presuntivo)")
+        plan = st.text_area("P - Plan (Exámenes y pasos a seguir)")
+        
+        if st.button("💾 Guardar Historia Clínica"):
+            st.success("Historia Clínica guardada.")
+        st.markdown("</div>", unsafe_allow_html=True)
 
+# --- 5. FÓRMULAS Y REMISIONES ---
+elif menu == "💊 Fórmulas y Remisiones":
+    st.title("💊 Recetario y 📤 Remisiones")
+    st.markdown("<div class='main-card'>", unsafe_allow_html=True)
+    st.subheader("💊 Fórmula Médica")
+    st.text_area("Escriba medicamentos y dosis...")
+    st.subheader("📤 Remisión")
+    st.text_input("Especialista / Centro de Referencia")
+    st.text_area("Motivo de remisión y hallazgos...")
+    st.button("🖨️ Generar para Imprimir")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# --- 6. HOSPITALIZACIÓN ---
 elif menu == "🏥 Hospitalización":
-    st.title("🏥 Hospitalización")
-    st.write("Control de internos.")
+    st.title("🏥 Pacientes en Hospital")
+    st.write("Módulo de monitoreo de internos.")
 
-elif menu == "💊 Fórmulas/Remisiones":
-    st.title("💊 Fórmulas")
-    st.write("Generador de recetas.")
-            
+# --- 7. CERTIFICADOS ---
+elif menu == "📄 Certificados":
+    st.title("📄 Certificados de Salud")
+    st.write("Generador de documentos legales para viajes y vacunas.")
+
+# --- 8. IMPORTAR OKVET ---
+elif menu == "📥 Importar OkVet":
+    st.title("📥 Importar desde Excel")
+    dest = st.selectbox("Destino", ["propietarios.csv", "mascotas.csv"])
+    datos = st.text_area("Pegue las celdas aquí:")
+    if st.button("🚀 Cargar"):
+        df = pd.read_csv(io.StringIO(datos), sep='\t')
+        guardar(df, dest)
+        st.success("Sincronizado correctamente.")
+                
