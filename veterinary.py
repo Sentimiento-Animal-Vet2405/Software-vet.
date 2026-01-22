@@ -7,21 +7,20 @@ from datetime import datetime, date
 # --- CONFIGURACIÓN ELITE ---
 st.set_page_config(page_title="Sentimiento Animal Elite", layout="wide", page_icon="🐾")
 
-# CSS: ESTÉTICA CIELO (Celeste claro, Letras Negras, Logo Circular)
+# CSS: ESTÉTICA CIELO
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap');
     html, body, [class*="css"] { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #f0f9ff; color: #000000 !important; }
     [data-testid="stSidebar"] { background-color: #bae6fd !important; border-right: 1px solid #7dd3fc; }
-    [data-testid="stSidebar"] [data-testid="stImage"] img { border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    [data-testid="stSidebar"] [data-testid="stImage"] img { border-radius: 50%; border: 3px solid white; }
     p, span, label, h1, h2, h3, .stMarkdown { color: #000000 !important; }
-    .main-card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); border: 1px solid #e0f2fe; margin-bottom: 20px; }
+    .main-card { background: white; padding: 25px; border-radius: 15px; border: 1px solid #e0f2fe; margin-bottom: 20px; }
     .stButton>button { background: #0284c7; color: white !important; border-radius: 12px; font-weight: 700; height: 3rem; border: none; }
-    .stDownloadButton>button { background: #0ea5e9 !important; color: white !important; border-radius: 12px; font-weight: 700; border: none; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- BASES DE DATOS ---
+# --- INICIALIZACIÓN DE BASES DE DATOS (Vital para que no salga en blanco) ---
 DB_FILES = {
     "propietarios": ["Nombre", "Tipo_Doc", "Numero", "Teléfono", "Correo", "Dirección"],
     "mascotas": ["ID_Prop", "Nombre_Mascota", "Especie", "Raza", "Sexo", "Color", "Peso_kg", "Nacimiento"],
@@ -34,54 +33,35 @@ for db, cols in DB_FILES.items():
 
 # --- NAVEGACIÓN ---
 with st.sidebar:
-    if os.path.exists("logo.png"): st.image("logo.png", width=140)
     st.markdown("<h2 style='text-align:center;'>Sentimiento Animal</h2>", unsafe_allow_html=True)
     st.markdown("<p style='text-align:center;'>Dra. Camila Mejía</p>", unsafe_allow_html=True)
     st.markdown("---")
     menu = st.radio("MENÚ PRINCIPAL", ["🏠 Dashboard", "👥 Clientes", "🐾 Pacientes", "🩺 Consulta IA", "📥 Importar de OkVet", "💾 Reportes"])
 
-# --- MODULO IMPORTAR (Ajustado para evitar errores) ---
-if menu == "📥 Importar de OkVet":
-    st.title("📥 Migración Maestra desde OkVet")
-    st.write("Dra. Camila, siga estos pasos para traer su información:")
-    
-    col_a, col_b = st.columns(2)
-    with col_a:
-        st.markdown("<div class='main-card'>", unsafe_allow_html=True)
-        st.subheader("1. Descargar Plantilla")
-        t_tipo = st.selectbox("Elija qué va a organizar:", ["propietarios", "mascotas"])
-        
-        # Generación de Excel compatible
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            pd.DataFrame(columns=DB_FILES[t_tipo]).to_excel(writer, index=False)
-        
-        st.download_button(
-            label=f"📥 Bajar Plantilla de {t_tipo}",
-            data=output.getvalue(),
-            file_name=f"plantilla_{t_tipo}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    with col_b:
-        st.markdown("<div class='main-card'>", unsafe_allow_html=True)
-        st.subheader("2. Subir Archivo Listo")
-        ok_file = st.file_uploader("Suba el Excel con los datos de OkVet", type=["xlsx"])
-        if ok_file:
-            df_up = pd.read_excel(ok_file)
-            if st.button("🚀 Cargar a la Nube"):
-                df_base = pd.read_csv(f"{t_tipo}.csv")
-                pd.concat([df_base, df_up]).to_csv(f"{t_tipo}.csv", index=False)
-                st.success("¡Datos migrados con éxito!")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-# (El resto de los módulos Dashboard, Consulta IA y Reportes se mantienen igual)
-elif menu == "🏠 Dashboard":
+# --- MODULOS ---
+if menu == "🏠 Dashboard":
     st.title("🏠 Panel de Control")
-    st.metric("Pacientes Totales", len(pd.read_csv("mascotas.csv")))
+    st.info("Bienvenida Dra. Camila. Si acaba de migrar datos de OkVet, aparecerán aquí.")
+    try:
+        df_m = pd.read_csv("mascotas.csv")
+        st.metric("Total Pacientes", len(df_m))
+    except:
+        st.write("Iniciando sistema...")
+
+elif menu == "📥 Importar de OkVet":
+    st.title("📥 Importar Datos")
+    st.write("Use esta sección para cargar sus Excels.")
+    # (Aquí iría el código de importación que ya tenemos)
+    st.warning("Asegúrese de que el archivo 'requirements.txt' esté creado en GitHub para descargar plantillas.")
 
 elif menu == "🩺 Consulta IA":
     st.title("🩺 Estación Médica")
-    st.write("Seleccione un paciente para iniciar.")
-                
+    st.write("Seleccione un paciente para comenzar la consulta.")
+    # Si las bases de datos están vacías, mostramos este mensaje amigable
+    df_p = pd.read_csv("propietarios.csv")
+    if df_p.empty:
+        st.warning("Aún no hay clientes. Registre uno en el menú 'Clientes' o impórtelos de OkVet.")
+    else:
+        st.success("Lista de clientes cargada correctamente.")
+
+# (Añada los demás bloques de código aquí)
