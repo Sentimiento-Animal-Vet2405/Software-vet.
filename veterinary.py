@@ -10,60 +10,76 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #bae6fd !important; }
     .main-card { background: white; padding: 20px; border-radius: 15px; border: 1px solid #e0f2fe; color: black; }
     .stButton>button { background: #0284c7; color: white !important; font-weight: bold; width: 100%; border-radius: 10px; }
+    p, h1, h2, h3, label { color: black !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- INICIALIZACIÓN AUTOMÁTICA ---
-DB_FILES = {
-    "propietarios.csv": ["Nombre", "Tipo_Doc", "Numero", "Teléfono", "Correo", "Dirección"],
-    "mascotas.csv": ["ID_Prop", "Nombre_Mascota", "Especie", "Raza", "Sexo", "Color", "Peso_kg", "Nacimiento"]
-}
-for db, cols in DB_FILES.items():
-    if not os.path.exists(db) or os.stat(db).st_size == 0:
-        pd.DataFrame(columns=cols).to_csv(db, index=False)
+# --- SISTEMA DE ARCHIVOS ROBUSTO ---
+def inicializar_y_leer(nombre_archivo, columnas):
+    if not os.path.exists(nombre_archivo) or os.stat(nombre_archivo).st_size == 0:
+        pd.DataFrame(columns=columnas).to_csv(nombre_archivo, index=False)
+    try:
+        return pd.read_csv(nombre_archivo)
+    except:
+        return pd.DataFrame(columns=columnas)
+
+# Columnas necesarias
+cols_p = ["Nombre", "Tipo_Doc", "Numero", "Teléfono", "Correo"]
+cols_m = ["ID_Prop", "Nombre_Mascota", "Especie", "Raza", "Sexo"]
 
 # --- MENÚ ---
 with st.sidebar:
     st.title("🐾 Sentimiento Animal")
-    menu = st.radio("MENÚ", ["🏠 Dashboard", "📥 Cargar Datos OkVet", "🩺 Consulta"])
+    st.write(f"**Dra. Camila Mejía**")
+    st.write("---")
+    menu = st.radio("MENÚ", ["🏠 Dashboard", "📥 Cargar de OkVet", "🩺 Consulta"])
 
-# --- MODULO DE CARGA DIRECTA ---
-if menu == "📥 Cargar Datos OkVet":
-    st.title("📥 Importar sus archivos de OkVet")
+# --- 1. DASHBOARD ---
+if menu == "🏠 Dashboard":
+    st.title("🏠 Estado de la Clínica")
+    df_p = inicializar_y_leer("propietarios.csv", cols_p)
+    df_m = inicializar_y_leer("mascotas.csv", cols_m)
+    
+    c1, c2 = st.columns(2)
+    c1.metric("Clientes", len(df_p))
+    c2.metric("Mascotas", len(df_m))
     
     st.markdown("<div class='main-card'>", unsafe_allow_html=True)
-    tipo = st.selectbox("1. ¿Qué archivo va a subir?", ["propietarios.csv", "mascotas.csv"])
+    if len(df_p) == 0:
+        st.info("👋 El sistema está listo. Vaya a 'Cargar de OkVet' para subir sus archivos.")
+    else:
+        st.success("✅ Base de datos activa y cargada.")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# --- 2. CARGADOR ULTRA-FLEXIBLE ---
+elif menu == "📥 Cargar de OkVet":
+    st.title("📥 Importar Archivos")
+    st.write("Suba aquí sus archivos descargados de OkVet.")
     
-    # Este cargador acepta XLSX y CSV sin pedir librerías extra
-    archivo = st.file_uploader("2. Seleccione su archivo (OkVet - Mascotas o OkVet - Propietarios)", type=["xlsx", "csv"])
+    target = st.selectbox("¿Qué datos va a subir?", ["propietarios.csv", "mascotas.csv"])
+    archivo = st.file_uploader("Seleccione el archivo (Excel o CSV)", type=["xlsx", "csv"])
     
     if archivo:
         try:
+            # Lector universal
             if archivo.name.endswith('.xlsx'):
-                # Intento de lectura directa de Excel
-                df_nuevo = pd.read_excel(archivo, engine='openpyxl')
+                df_nuevo = pd.read_excel(archivo)
             else:
-                # Lectura de CSV flexible
                 try: df_nuevo = pd.read_csv(archivo, sep=',')
                 except: df_nuevo = pd.read_csv(archivo, sep=';')
             
-            st.write("✅ **Vista previa de sus datos:**")
+            st.write("✅ **Vista previa de los datos:**")
             st.dataframe(df_nuevo.head(5))
             
-            if st.button("🚀 INTEGRAR DATOS AHORA"):
-                df_nuevo.to_csv(tipo, index=False)
-                st.success(f"¡Excelente! Los datos de {archivo.name} ya están en el sistema.")
+            if st.button("🚀 GUARDAR DATOS EN EL SISTEMA"):
+                df_nuevo.to_csv(target, index=False)
+                st.success(f"¡Éxito! {len(df_nuevo)} registros cargados.")
                 st.balloons()
         except Exception as e:
-            st.error(f"Error técnico: {e}")
-            st.info("Dra., si el Excel falla, intente subir el archivo que termina en .csv que ya tiene listo.")
-    st.markdown("</div>", unsafe_allow_html=True)
+            st.error("Error al leer el archivo. Intente subir la versión .csv que ya tiene lista.")
 
-elif menu == "🏠 Dashboard":
-    st.title("🏠 Estado de la Clínica")
-    p = pd.read_csv("propietarios.csv")
-    m = pd.read_csv("mascotas.csv")
-    c1, c2 = st.columns(2)
-    c1.metric("Clientes", len(p))
-    c2.metric("Mascotas", len(m))
-    
+# --- 3. CONSULTA (BÁSICA) ---
+elif menu == "🩺 Consulta":
+    st.title("🩺 Estación Médica")
+    st.write("Módulo listo para recibir sus datos.")
+                
