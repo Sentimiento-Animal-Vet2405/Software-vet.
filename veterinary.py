@@ -3,122 +3,115 @@ import pandas as pd
 import os
 from datetime import datetime
 
-# --- CONFIGURACIÓN VISUAL ---
-st.set_page_config(page_title="Sentimiento Animal Elite", layout="wide")
+# --- CONFIGURACIÓN DE PANTALLA ---
+st.set_page_config(page_title="Sentimiento Animal Elite", layout="wide", page_icon="🐾")
 
+# CSS: ESTÉTICA CIELO (Letras negras y fondo celeste)
 st.markdown("""
     <style>
     html, body, [class*="css"] { background-color: #f0f9ff; color: black !important; }
-    [data-testid="stSidebar"] { background-color: #bae6fd !important; border-right: 2px solid #7dd3fc; }
-    .main-card { background: white; padding: 20px; border-radius: 15px; border: 1px solid #e0f2fe; margin-bottom: 15px; }
-    .stButton>button { background: #0284c7 !important; color: white !important; font-weight: bold; border-radius: 10px; width: 100%; }
-    .hosp-alert { background: #fee2e2; border-left: 5px solid #ef4444; padding: 10px; border-radius: 5px; margin-bottom: 5px; }
+    [data-testid="stSidebar"] { background-color: #bae6fd !important; }
+    .stButton>button { background: #0284c7 !important; color: white !important; border-radius: 10px; font-weight: bold; width: 100%; }
+    .main-card { background: white; padding: 20px; border-radius: 15px; border: 1px solid #e0f2fe; margin-bottom: 10px; color: black; }
+    .hosp-rojo { background: #fee2e2; border-left: 5px solid #ef4444; padding: 10px; border-radius: 8px; margin-bottom: 5px; }
     p, h1, h2, h3, label, span { color: #02456e !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- BASES DE DATOS (AUTO-CREACIÓN) ---
-DB_CONFIG = {
+# --- SISTEMA DE DATOS ROBUSTO ---
+ARCHIVOS = {
     "propietarios.csv": ["Nombre", "Documento", "Telefono", "Correo"],
-    "mascotas.csv": ["Doc_Dueño", "Nombre_Mascota", "Especie", "Raza", "Sexo", "Peso"],
+    "mascotas.csv": ["Doc_Dueño", "Nombre_Mascota", "Especie", "Raza", "Sexo"],
     "historias.csv": ["Fecha", "Mascota", "S", "O", "I", "P", "Vacunas", "Lab"],
-    "hospitalizados.csv": ["Mascota", "Estado", "Motivo", "Fecha_Ingreso"]
+    "hospital.csv": ["Mascota", "Estado", "Motivo", "Fecha_Ingreso"]
 }
 
-for db, cols in DB_CONFIG.items():
-    if not os.path.exists(db) or os.stat(db).st_size == 0:
-        pd.DataFrame(columns=cols).to_csv(db, index=False)
+for archivo, columnas in ARCHIVOS.items():
+    if not os.path.exists(archivo) or os.stat(archivo).st_size == 0:
+        pd.DataFrame(columns=columnas).to_csv(archivo, index=False)
 
-def cargar(db):
-    return pd.read_csv(db)
+def leer_datos(archivo):
+    return pd.read_csv(archivo)
 
-# --- MENÚ LATERAL ---
+# --- NAVEGACIÓN LATERAL ---
 with st.sidebar:
     st.title("🐾 Sentimiento Animal")
-    st.write("Dra. Camila Mejía")
+    st.write(f"**Dra. Camila Mejía**")
     st.write("---")
-    menu = st.radio("SISTEMA INTEGRAL", ["🏠 Dashboard", "🩺 Consulta Full", "🏥 Hospitalización", "📥 Migrar OkVet"])
+    menu = st.radio("SECCIONES DEL HOSPITAL", ["🏠 Dashboard", "🩺 Consulta SOIP", "🏥 Hospitalización", "💉 Vacunación", "🧪 Laboratorio", "📥 Importar OkVet"])
 
-# --- 1. DASHBOARD ---
+# --- 1. DASHBOARD (RESUMEN) ---
 if menu == "🏠 Dashboard":
-    st.title("🏠 Resumen de la Clínica")
-    df_p = cargar("propietarios.csv")
-    df_m = cargar("mascotas.csv")
-    df_h = cargar("hospitalizados.csv")
+    st.title("🏠 Resumen del Hospital")
+    df_p = leer_datos("propietarios.csv")
+    df_m = leer_datos("mascotas.csv")
+    df_h = leer_datos("hospital.csv")
     
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Clientes", len(df_p))
-    col2.metric("Pacientes", len(df_m))
-    col3.metric("En Hospital", len(df_h))
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Clientes", len(df_p))
+    c2.metric("Pacientes", len(df_m))
+    c3.metric("Hospitalizados", len(df_h))
     
-    st.subheader("🚨 Pacientes Internados")
+    st.subheader("🚨 Alerta de Hospitalización")
     if not df_h.empty:
         for i, r in df_h.iterrows():
-            st.markdown(f"<div class='hosp-alert'>🐶 <b>{r['Mascota']}</b> - Estado: {r['Estado']}<br><small>{r['Motivo']}</small></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='hosp-rojo'><b>🐶 {r['Mascota']}</b> - {r['Estado']}<br>{r['Motivo']}</div>", unsafe_allow_html=True)
     else:
-        st.info("No hay pacientes en hospital en este momento.")
+        st.info("No hay pacientes críticos internados.")
 
-# --- 2. CONSULTA FULL (SOIP + VACUNAS + LABS) ---
-elif menu == "🩺 Consulta Full":
-    st.title("🩺 Estación Médica Integral")
-    df_m = cargar("mascotas.csv")
-    
+# --- 2. CONSULTA SOIP ---
+elif menu == "🩺 Consulta SOIP":
+    st.title("🩺 Historia Clínica (SOIP)")
+    df_m = leer_datos("mascotas.csv")
     if df_m.empty:
-        st.warning("Debe cargar pacientes desde 'Migrar OkVet' primero.")
+        st.warning("Primero cargue pacientes en la sección 'Importar OkVet'.")
     else:
-        paciente = st.selectbox("Seleccione Paciente:", df_m["Nombre_Mascota"].tolist())
+        paciente = st.selectbox("Seleccione Paciente:", df_m["Nombre_Mascota"].unique())
+        col1, col2 = st.columns(2)
+        s = col1.text_area("Subjetivo (Anamnesis)")
+        o = col2.text_area("Objetivo (Examen Físico)")
+        i = col1.text_area("Interpretación (Diagnóstico)")
+        p = col2.text_area("Plan (Tratamiento)")
         
-        t1, t2, t3 = st.tabs(["📝 Historia SOIP", "💉 Vacunas y Desp.", "🧪 Labs y Remisión"])
-        
-        with t1:
-            col_a, col_b = st.columns(2)
-            sub = col_a.text_area("Subjetivo (Anamnesis)")
-            obj = col_b.text_area("Objetivo (Examen Físico)")
-            int_p = col_a.text_area("Interpretación (Diagnóstico)")
-            plan = col_b.text_area("Plan (Tratamiento)")
-        
-        with t2:
-            vac = st.text_input("Vacuna Aplicada")
-            desp = st.text_input("Desparasitación")
-        
-        with t3:
-            lab_sol = st.text_area("Laboratorios Solicitados")
-            remit = st.text_area("Remisión a Especialista")
-
-        if st.button("💾 Guardar Consulta y Generar Reporte"):
-            df_his = cargar("historias.csv")
-            nueva_h = {"Fecha": datetime.now().strftime("%Y-%m-%d"), "Mascota": paciente, "S": sub, "O": obj, "I": int_p, "P": plan, "Vacunas": vac, "Lab": lab_sol}
+        if st.button("💾 Guardar Historia Clínica"):
+            df_his = leer_datos("historias.csv")
+            nueva_h = {"Fecha": datetime.now().date(), "Mascota": paciente, "S": s, "O": o, "I": i, "P": p}
             pd.concat([df_his, pd.DataFrame([nueva_h])]).to_csv("historias.csv", index=False)
-            st.success("¡Historia guardada!")
+            st.success("¡Historia guardada exitosamente!")
             st.balloons()
 
 # --- 3. HOSPITALIZACIÓN ---
 elif menu == "🏥 Hospitalización":
-    st.title("🏥 Módulo de Internamiento")
-    df_m = cargar("mascotas.csv")
-    
-    with st.form("hosp_form"):
-        p_hosp = st.selectbox("Paciente a ingresar:", df_m["Nombre_Mascota"].tolist() if not df_m.empty else ["Sin datos"])
-        estado = st.selectbox("Estado:", ["Estable", "Reservado", "Crítico"])
-        motivo = st.text_area("Motivo de ingreso y observaciones")
-        if st.form_submit_button("Confirmar Ingreso"):
-            df_hos = cargar("hospitalizados.csv")
-            pd.concat([df_hos, pd.DataFrame([{"Mascota":p_hosp, "Estado":estado, "Motivo":motivo, "Fecha_Ingreso": datetime.now()}])]).to_csv("hospitalizados.csv", index=False)
-            st.success("Paciente ingresado a hospitalización.")
+    st.title("🏥 Control de Internamiento")
+    df_m = leer_datos("mascotas.csv")
+    with st.form("form_hosp"):
+        p_hosp = st.selectbox("Paciente para ingreso:", df_m["Nombre_Mascota"].unique() if not df_m.empty else ["Sin datos"])
+        est = st.selectbox("Estado de salud:", ["Estable", "Reservado", "Crítico"])
+        mot = st.text_area("Motivo de hospitalización")
+        if st.form_submit_button("Ingresar Paciente"):
+            df_h = leer_datos("hospital.csv")
+            pd.concat([df_h, pd.DataFrame([{"Mascota":p_hosp, "Estado":est, "Motivo":mot, "Fecha_Ingreso": datetime.now()}])]).to_csv("hospital.csv", index=False)
+            st.success("Paciente registrado en hospital.")
 
-# --- 4. MIGRACIÓN ---
-elif menu == "📥 Migrar OkVet":
-    st.title("📥 Importador de OkVet")
-    target = st.selectbox("¿Qué archivo va a subir?", ["propietarios.csv", "mascotas.csv"])
-    f = st.file_uploader("Suba su archivo (Preferiblemente CSV)", type=["csv", "xlsx"])
+# --- 4. IMPORTAR OKVET (EL MOTOR DE DATOS) ---
+elif menu == "📥 Importar OkVet":
+    st.title("📥 Carga de Datos desde OkVet")
+    tipo = st.selectbox("¿Qué va a subir?", ["propietarios.csv", "mascotas.csv"])
+    f = st.file_uploader("Suba su archivo CSV o Excel", type=["csv", "xlsx"])
     
     if f:
         try:
-            df_up = pd.read_excel(f) if f.name.endswith('xlsx') else pd.read_csv(f, sep=None, engine='python')
+            # Lector flexible para evitar el error de openpyxl
+            if f.name.endswith('xlsx'):
+                df_up = pd.read_excel(f)
+            else:
+                df_up = pd.read_csv(f, sep=None, engine='python')
+            
+            st.write("✅ **Vista previa:**")
             st.dataframe(df_up.head())
-            if st.button("🚀 Procesar Migración"):
-                df_up.to_csv(target, index=False)
-                st.success("¡Migración terminada!")
+            if st.button("🚀 Integrar al Sistema"):
+                df_up.to_csv(tipo, index=False)
+                st.success("¡Datos migrados! Ya puede verlos en el Dashboard.")
         except:
-            st.error("Error al leer. Intente guardar su Excel como 'CSV (delimitado por comas)'.")
+            st.error("Error al leer el archivo. Intente guardarlo como CSV en Excel.")
             
