@@ -1,130 +1,197 @@
 import streamlit as st
 import pandas as pd
-import io
 import os
+import io
 from datetime import datetime
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet
 
-# --- CONFIGURACIÓN ESTÉTICA AVANZADA ---
-st.set_page_config(page_title="Sentimiento Animal - OkVet", layout="wide")
+# --- CONFIGURACIÓN ESTÉTICA PREMIUM ---
+st.set_page_config(page_title="Sentimiento Animal | Gestión Elite", layout="wide")
 
+# CSS para elegancia: Sombras, gradientes y bordes redondeados
 st.markdown("""
     <style>
-    .main { background-color: #f1f5f9; }
-    [data-testid="stSidebar"] { background-color: #0f172a; }
-    .stButton>button { 
-        border-radius: 8px; background-color: #2563eb; color: white; 
-        font-weight: bold; height: 3.5rem; border: none;
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    
+    html, body, [class*="css"]  {
+        font-family: 'Inter', sans-serif;
+        background-color: #fcfcfd;
     }
-    .st-expander { background-color: white !important; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-    h1, h2 { color: #1e293b; font-family: 'Helvetica Neue', sans-serif; }
-    .card { background-color: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+    
+    /* Barra lateral elegante */
+    [data-testid="stSidebar"] {
+        background-color: #0f172a;
+        border-right: 1px solid #e2e8f0;
+    }
+    
+    /* Tarjetas blancas con sombra sutil (como OkVet Pro) */
+    .stBlock {
+        background-color: white;
+        padding: 2rem;
+        border-radius: 16px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        border: 1px solid #f1f5f9;
+        margin-bottom: 1.5rem;
+    }
+    
+    /* Botones Premium */
+    .stButton>button {
+        background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        font-weight: 600;
+        padding: 0.75rem 1.5rem;
+        transition: all 0.3s ease;
+    }
+    
+    .stButton>button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Títulos con color azul marino */
+    h1, h2, h3 {
+        color: #0f172a;
+        font-weight: 700;
+        letter-spacing: -0.025em;
+    }
+    
+    /* Inputs minimalistas */
+    .stTextInput>div>div>input, .stTextArea>div>div>textarea {
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        background-color: #f8fafc;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- BASE DE DATOS ---
-DB_PATH = "base_datos_vet.csv"
-if not os.path.exists(DB_PATH):
-    columnas = ["Fecha", "Mascota", "Propietario", "Tipo", "Detalles", "Peso", "T", "FC", "FR", "Plan"]
-    pd.DataFrame(columns=columnas).to_csv(DB_PATH, index=False)
+# --- BASES DE DATOS ---
+DB_PROPIETARIOS = "propietarios.csv"
+DB_PACIENTES = "pacientes.csv"
+DB_CONSULTAS = "consultas_soip.csv"
 
-def guardar_registro(data):
-    df = pd.read_csv(DB_PATH)
-    df = pd.concat([df, pd.DataFrame([data])], ignore_index=True)
-    df.to_csv(DB_PATH, index=False)
+for db, cols in {
+    DB_PROPIETARIOS: ["Documento", "Nombre", "Teléfono", "Correo", "Dirección"],
+    DB_PACIENTES: ["ID_Prop", "Nombre_Mascota", "Especie", "Raza"],
+    DB_CONSULTAS: ["Fecha", "ID_Prop", "Mascota", "S", "O", "I", "P"]
+}.items():
+    if not os.path.exists(db):
+        pd.DataFrame(columns=cols).to_csv(db, index=False)
 
 # --- MENÚ LATERAL ---
 with st.sidebar:
-    if os.path.exists("logo.png"): st.image("logo.png")
-    st.title("OKVET SYSTEM")
+    if os.path.exists("logo.png"):
+        st.image("logo.png", width=160)
+    st.markdown("<br><h3 style='color:white; text-align:center;'>Dra. Camila Mejía</h3>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#94a3b8; text-align:center;'>Sentimiento Animal Vet</p>", unsafe_allow_html=True)
     st.markdown("---")
-    menu = st.radio("Navegación Profesional", [
-        "🏠 Dashboard",
-        "📋 Consulta (SOIP)",
-        "🏥 Hospitalización",
-        "💉 Vacunación",
-        "💊 Fórmulas Médicas",
-        "📂 Historial General"
-    ])
+    menu = st.radio("NAVEGACIÓN PRINCIPAL", 
+                    ["✨ Dashboard", "👥 Clientes y Pacientes", "📋 Consulta Médica", "💾 Backup & Datos"])
 
-# --- MÓDULO: HOSPITALIZACIÓN (Con Tabla de Constantes) ---
-if menu == "🏥 Hospitalización":
-    st.header("🏥 Registro de Hospitalización / Monitoreo")
+# --- MÓDULO DASHBOARD ---
+if menu == "✨ Dashboard":
+    st.title("✨ Bienvenida al Sistema")
+    st.markdown("Resumen general de tu práctica veterinaria.")
     
-    with st.container():
-        c1, c2, c3 = st.columns(3)
-        paciente = c1.text_input("Paciente")
-        propietario = c2.text_input("Propietario")
-        fecha_ingreso = c3.date_input("Fecha de Ingreso")
-
-        st.markdown("#### 📊 Monitoreo de Constantes Fisiológicas")
-        # Tabla de constantes como en OkVet
-        col_t1, col_t2, col_t3, col_t4 = st.columns(4)
-        temp = col_t1.text_input("T° (°C)")
-        fc = col_t2.text_input("FC (lpm)")
-        fr = col_t3.text_input("FR (rpm)")
-        tllc = col_t4.text_input("TLLC (seg)")
-        
-        fluidos = st.text_area("Fluidoterapia y Medicación Intrahospitalaria")
-        evolucion = st.text_area("Notas de Evolución Clínica")
-
-        if st.button("💾 GUARDAR MONITOREO"):
-            data = {
-                "Fecha": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                "Mascota": paciente, "Propietario": propietario,
-                "Tipo": "Hospitalización", "T": temp, "FC": fc, "FR": fr,
-                "Detalles": evolucion, "Plan": fluidos
-            }
-            guardar_registro(data)
-            st.success("Registro de hospitalización guardado.")
-
-# --- MÓDULO: VACUNACIÓN ---
-elif menu == "💉 Vacunación":
-    st.header("💉 Plan de Vacunación")
-    with st.expander("Registrar Aplicación de Vacuna", expanded=True):
-        col_v1, col_v2 = st.columns(2)
-        v_paciente = col_v1.text_input("Nombre Mascota")
-        v_tipo = col_v2.selectbox("Vacuna", ["Triple Felina", "Rabia", "Parvovirus/Moquillo", "Pentavalente", "Leucemia", "Otra"])
-        
-        v_lote = st.text_input("Lote / Marca de la Vacuna")
-        v_proxima = st.date_input("Fecha sugerida de refuerzo")
-        
-        if st.button("💾 REGISTRAR VACUNA"):
-            data = {"Fecha": datetime.now().strftime("%Y-%m-%d"), "Mascota": v_paciente, "Tipo": "Vacuna", "Detalles": f"{v_tipo} - Lote: {v_lote}", "Plan": f"Refuerzo: {v_proxima}"}
-            guardar_registro(data)
-            st.success("Vacuna registrada en el historial.")
-
-# --- MÓDULO: CONSULTA SOIP (Repetimos para consistencia) ---
-elif menu == "📋 Consulta (SOIP)":
-    st.header("📋 Consulta Médica (SOIP)")
-    with st.form("soip_form"):
-        c1, c2 = st.columns(2)
-        paciente = c1.text_input("Mascota")
-        dueno = c2.text_input("Propietario")
-        
-        s = st.text_area("Subjetivo")
-        o = st.text_area("Objetivo")
-        i = st.text_area("Interpretación")
-        p = st.text_area("Plan")
-        
-        if st.form_submit_button("💾 GUARDAR CONSULTA"):
-            data = {"Fecha": datetime.now().strftime("%Y-%m-%d %H:%M"), "Mascota": paciente, "Propietario": dueno, "Tipo": "Consulta", "Detalles": f"S:{s} O:{o} I:{i}", "Plan": p}
-            guardar_registro(data)
-            st.success("Consulta guardada.")
-
-# --- MÓDULO: DASHBOARD ---
-elif menu == "🏠 Dashboard":
-    st.header("🏠 Resumen Sentimiento Animal")
-    df = pd.read_csv(DB_PATH)
+    df_p = pd.read_csv(DB_PROPIETARIOS)
+    df_m = pd.read_csv(DB_PACIENTES)
     
-    col_a, col_b, col_c = st.columns(3)
-    col_a.metric("Pacientes Totales", len(df["Mascota"].unique()))
-    col_b.metric("Atenciones Mes", len(df))
-    col_c.metric("Estado de Red", "Online ✅")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.metric("Total Clientes", len(df_p))
+    with c2:
+        st.metric("Pacientes Registrados", len(df_m))
+    with c3:
+        st.metric("Consultas del Mes", "Digital")
     
-    st.markdown("### 📅 Últimas 5 Actividades")
-    st.dataframe(df.tail(5), use_container_width=True)
+    st.markdown("---")
+    st.subheader("🔍 Localizador Rápido de Pacientes")
+    busqueda = st.text_input("Buscar por nombre del paciente...", placeholder="Ej: Toby")
+    if busqueda:
+        df_c = pd.read_csv(DB_CONSULTAS)
+        res = df_c[df_c["Mascota"].str.contains(busqueda, case=False, na=False)]
+        st.dataframe(res, use_container_width=True)
 
-# --- MÓDULO: HISTORIAL ---
-elif menu == "📂 Historial General":
-    st.header("📂 Buscador de Historias Clínicas")
-    buscar = st.text
+# --- MÓDULO CLIENTES ---
+elif menu == "👥 Clientes y Pacientes":
+    st.title("👥 Gestión de Clientes")
+    
+    tab1, tab2 = st.tabs(["🆕 Registrar Dueño", "🐾 Vincular Paciente"])
+    
+    with tab1:
+        with st.container():
+            st.markdown("### Información del Propietario")
+            with st.form("new_prop", clear_on_submit=True):
+                col1, col2 = st.columns(2)
+                doc = col1.text_input("Cédula / Documento *")
+                nom = col2.text_input("Nombre Completo *")
+                tel = col1.text_input("Teléfono de contacto")
+                cor = col2.text_input("Correo electrónico")
+                dir = st.text_input("Dirección de residencia")
+                if st.form_submit_button("Guardar Propietario"):
+                    if doc and nom:
+                        df = pd.read_csv(DB_PROPIETARIOS)
+                        pd.concat([df, pd.DataFrame([{"Documento":doc,"Nombre":nom,"Teléfono":tel,"Correo":cor,"Dirección":dir}])]).to_csv(DB_PROPIETARIOS, index=False)
+                        st.success("✅ Propietario registrado exitosamente.")
+    
+    with tab2:
+        df_p = pd.read_csv(DB_PROPIETARIOS)
+        if not df_p.empty:
+            st.markdown("### Nueva Mascota")
+            propietario = st.selectbox("Seleccione el Dueño:", df_p["Nombre"] + " (" + df_p["Documento"].astype(str) + ")")
+            id_p = propietario.split("(")[-1].replace(")","")
+            
+            with st.form("new_pet", clear_on_submit=True):
+                c1, c2, c3 = st.columns(3)
+                p_nom = c1.text_input("Nombre Mascota")
+                p_esp = c2.selectbox("Especie", ["Canino", "Felino", "Equino", "Otro"])
+                p_raz = c3.text_input("Raza")
+                if st.form_submit_button("Vincular al Sistema"):
+                    df_m = pd.read_csv(DB_PACIENTES)
+                    pd.concat([df_m, pd.DataFrame([{"ID_Prop":id_p,"Nombre_Mascota":p_nom,"Especie":p_esp,"Raza":p_raz}])]).to_csv(DB_PACIENTES, index=False)
+                    st.success(f"🐾 {p_nom} ha sido vinculado correctamente.")
+
+# --- MÓDULO CONSULTA ---
+elif menu == "📋 Consulta Médica":
+    st.title("📋 Registro Clínico SOIP")
+    df_p = pd.read_csv(DB_PROPIETARIOS)
+    df_m = pd.read_csv(DB_PACIENTES)
+    
+    if not df_p.empty and not df_m.empty:
+        col_sel1, col_sel2 = st.columns(2)
+        prop = col_sel1.selectbox("Propietario", df_p["Nombre"] + " (" + df_p["Documento"].astype(str) + ")")
+        doc_id = prop.split("(")[-1].replace(")","")
+        
+        mascotas = df_m[df_m["ID_Prop"].astype(str) == doc_id]["Nombre_Mascota"].tolist()
+        masc_sel = col_sel2.selectbox("Paciente", mascotas)
+        
+        st.markdown("---")
+        with st.container():
+            col_s, col_o = st.columns(2)
+            s = col_s.text_area("S: Subjetivo", height=120, placeholder="Anamnesis y síntomas...")
+            o = col_o.text_area("O: Objetivo", height=120, placeholder="Constantes y examen físico...")
+            
+            col_i, col_p = st.columns(2)
+            i = col_i.text_area("I: Interpretación", height=120, placeholder="Diagnóstico...")
+            p = col_p.text_area("P: Plan Terapéutico", height=120, placeholder="Tratamiento y medicina...")
+            
+            if st.button("💾 FINALIZAR Y GUARDAR CONSULTA"):
+                df_c = pd.read_csv(DB_CONSULTAS)
+                nueva = {"Fecha": datetime.now().strftime("%d/%m/%Y"), "ID_Prop": doc_id, "Mascota": masc_sel, "S": s, "O": o, "I": i, "P": p}
+                pd.concat([df_c, pd.DataFrame([nueva])]).to_csv(DB_CONSULTAS, index=False)
+                st.balloons()
+                st.success(f"Consulta de {masc_sel} guardada con éxito.")
+
+# --- MÓDULO BACKUP ---
+elif menu == "💾 Backup & Datos":
+    st.title("💾 Centro de Datos")
+    st.info("Desde aquí puedes descargar tus respaldos o importar registros masivos.")
+    
+    # Aquí irían los botones de descarga de Excel que ya configuramos
+    st.write("Seleccione la acción deseada:")
+    st.button("📥 Descargar Copia de Seguridad Excel")
+    st.button("📤 Importar Pacientes de Excel")
